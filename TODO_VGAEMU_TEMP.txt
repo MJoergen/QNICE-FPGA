@@ -27,6 +27,17 @@ branch to the regular development folder and/or even release it:
   Emulator runs. Probably the speed in the Emulator depends on the display
   size (640x480 vs ...), so we need to take care of that, too.
 
+  As a step one, I could start by adding a "instructions per second"
+  measurement mechanism to the emulator first, and then (later) use the above
+  mentioned combination of an instruction counter and the tick counter
+  to have a calibrated and fixed "hardware instructions per second". The
+  later is then stored as a constant in the emulator and used to
+  automatically adjust the emulator speed to the host's CPU.
+
+  While adding the hardware registers (VHDL) for the instruction counter,
+  I might want to seize the opportunity and also do the very first
+  bullet point from TODO.txt.
+
 * Multiple Window sizes (640x480, Doubled, 16:9, ..., even free sizing?)
 
 * Full Screen mode (aspect ratio can be chosen: 4:3 or 16:9)
