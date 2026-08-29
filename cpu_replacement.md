@@ -29,9 +29,9 @@ port (
 ```
 
 The utilization report shows:
-* Slice LUTs       = 3468
-   * LUT as Logic  = 2060
-   * LUT as Memory = 1408
-* Slice Registers  =  396
-* Block RAM        =    0
+* Slice LUTs      = 3468
+  * LUT as Logic  = 2060
+  * LUT as Memory = 1408
+* Slice Registers =  396
+* Block RAM       =    0
 
