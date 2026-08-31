@@ -377,7 +377,7 @@
           <Attr Name="UsedIn" Val="synthesis"/>
         </FileInfo>
       </File>
-      <File Path="$PPRDIR/../../../../vhdl/hw/nexys4ddr/core.vhd">
+      <File Path="$PPRDIR/../../../../vhdl/core.vhd">
         <FileInfo SFType="VHDL2008">
           <Attr Name="Library" Val="xil_defaultlib"/>
           <Attr Name="UsedIn" Val="synthesis"/>
