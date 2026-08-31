@@ -89,6 +89,7 @@ signal reg_write_data      : std_logic_vector(15 downto 0) := (others => '0');
 signal reg_write_en        : std_logic := '0';
 signal reg_revert_en       : std_logic := '0';
 signal reg_force_shadowing : std_logic := '0';
+signal reg_shadow_en       : std_logic;
 signal reg_shadow_spr      : std_logic; --combinatorial signal to control the shadowing of special regs (SP, SR, PC)
 
 -- direct access to the special registers within the register bank
@@ -268,6 +269,7 @@ begin
    Dst_Value_Fast <= reg_read_data2 when FastPath and cpu_state = cs_execute else Dst_Value;
       
    -- Registers
+   reg_shadow_en <= (not Int_Active) or reg_force_shadowing;
    Registers : entity work.register_file
       port map
       (
@@ -291,7 +293,7 @@ begin
          
          -- the upper registers are shadowed at each write operation, so that they can
          -- be restored any time (e.g. when returning from an interrupt) using revert_en
-         shadow_en      => (not Int_Active) or reg_force_shadowing,
+         shadow_en      => reg_shadow_en,
          shadow_spr_en  => reg_shadow_spr
       );
       

@@ -29,8 +29,13 @@ architecture beh of til_display is
 signal TIL_311_buffer         : std_logic_vector(15 downto 0) := x"0000";
 signal TIL_311_mask           : std_logic_vector(3 downto 0)  := "1111";
 
+signal drive_digits : std_logic_vector(31 downto 0);
+signal drive_mask   : std_logic_vector(7 downto 0);
+
 begin
 
+   drive_digits <= x"0000" & TIL_311_buffer;
+   drive_mask   <= "0000" & TIL_311_mask;
    -- 7 segment display: Nexys 4 DDR specific component
    disp_7seg : entity work.drive_7digits
       generic map
@@ -40,8 +45,8 @@ begin
       port map
       (
          clk => clk,
-         digits => x"0000" & TIL_311_buffer,
-         mask => "0000" & TIL_311_mask,
+         digits => drive_digits,
+         mask => drive_mask,
          SSEG_AN => SSEG_AN,
          SSEG_CA => SSEG_CA
       );

@@ -142,7 +142,7 @@ begin
       end if;
    end process;
 
-   reading <= '1' when uart_en = '1' and uart_we = '0' and uart_reg = "10" else '0';
+   reading <= '1' when uart_en = '1' and uart_we = '0' and unsigned(uart_reg) = "10" else '0';
    
    read_registers : process(uart_en, uart_we, uart_reg, uart_tx_ready, fifo_empty, fifo_rd_data, uart_divisor)
    begin 
@@ -177,7 +177,7 @@ begin
    begin
       if rising_edge(clk) then
          -- register 0: UART baudrate divisor
-         if uart_en = '1' and uart_we = '1' and uart_reg = "00" then
+         if uart_en = '1' and uart_we = '1' and unsigned(uart_reg) = "00" then
             -- Only store values within range of allowed values
             if conv_integer(cpu_data_in) >= 16 and conv_integer(cpu_data_in) <= 4095 then
                uart_divisor <= cpu_data_in;
@@ -185,7 +185,7 @@ begin
          end if;
 
          -- register 3: send (aka write) register
-         if uart_en = '1' and uart_we = '1' and uart_reg = "11" then
+         if uart_en = '1' and uart_we = '1' and unsigned(uart_reg) = "11" then
             byte_tx_data <= cpu_data_in(7 downto 0);
          end if;
 
@@ -206,7 +206,7 @@ begin
    begin
       if rising_edge(clk) then
          -- tx_ready listens to write operations to register 3
-         if uart_en = '1' and uart_we = '1' and uart_reg = "11" then
+         if uart_en = '1' and uart_we = '1' and unsigned(uart_reg) = "11" then
             byte_tx_ready <= '1';
          end if;
 

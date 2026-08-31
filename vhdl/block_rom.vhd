@@ -70,7 +70,7 @@ begin
          if ce = '1' then
             output <= to_stdlogicvector(brom(conv_integer(address)));
          else
-            output <= (others => 'U');
+            output <= (others => '0');
          end if;
       end if;
    end process;

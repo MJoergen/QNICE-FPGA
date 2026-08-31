@@ -74,21 +74,17 @@ type special_register_array is array(13 to 15) of std_logic_vector(15 downto 0);
 -- model the lower register bank (windowed)
 type rega is array (0 to 8*SHADOW_REGFILE_SIZE-1) of std_logic_vector(15 downto 0);
 
-signal LowerRegisterWindow    : rega;
-signal UpperRegisters         : upper_register_array;
-signal UpperRegisters_Org     : upper_register_array;
-signal SpecialRegisters       : special_register_array;
-signal SpecialRegisters_Org   : special_register_array;
+signal LowerRegisterWindow    : rega := (others => X"0000");
+signal UpperRegisters         : upper_register_array := (others => X"0000");
+signal UpperRegisters_Org     : upper_register_array := (others => X"0000");
+signal SpecialRegisters       : special_register_array := (others => X"0000");
+signal SpecialRegisters_Org   : special_register_array := (others => X"0000");
 
 signal sel_rbank_mul8         : std_logic_vector(10 downto 0);
-signal sel_rbank_i            : integer;
+signal sel_rbank_i            : integer := 0;
 signal write_addr_i           : integer;
-signal read_addr1_i           : integer;
-signal read_addr2_i           : integer;
 
 signal is_upper_register_wr   : boolean;
-signal is_upper_register_rd1  : boolean;
-signal is_upper_register_rd2  : boolean;
 signal is_special_register_wr : boolean;
 
 -- Copy of CPU registers. Only used for debugging
@@ -133,16 +129,12 @@ begin
    
    sel_rbank_i  <= conv_integer(sel_rbank_mul8);
    write_addr_i <= conv_integer(write_addr);
-   read_addr1_i <= conv_integer(read_addr1);
-   read_addr2_i <= conv_integer(read_addr2);
 
    -- performance optimization: instead of using "<" and ">" we specify bit patterns
    -- a special register is > 12
    -- an upper register is >= 8 and < 13
    is_special_register_wr <= true when write_addr(3) = '1' and write_addr(2) = '1' and (write_addr(1) = '1' or write_addr(0) = '1') else false;   
    is_upper_register_wr   <= true when write_addr(3) = '1' and (write_addr(2) = '0' or (write_addr(1) = '0' and write_addr(0) = '0')) else false;
-   is_upper_register_rd1  <= true when read_addr1(3) = '1' and (read_addr1(2) = '0' or (read_addr1(1) = '0' and read_addr1(0) = '0')) else false;
-   is_upper_register_rd2  <= true when read_addr2(3) = '1' and (read_addr2(2) = '0' or (read_addr2(1) = '0' and read_addr2(0) = '0')) else false;
 
    special_write_register : process(clk)
    variable
@@ -205,25 +197,37 @@ begin
       end if;
    end process;
    
-   read_register1 : process(sel_rbank_i, read_addr1, read_addr1_i, is_upper_register_rd1, LowerRegisterWindow, UpperRegisters, SpecialRegisters)
+   read_register1 : process(sel_rbank_i, read_addr1, LowerRegisterWindow, UpperRegisters, SpecialRegisters)
+     variable is_upper_register_rd1_v : boolean;
+     variable read_addr1_v : integer range 0 to 15;
    begin
+      is_upper_register_rd1_v := read_addr1(3) = '1' and
+        (read_addr1(2) = '0' or (read_addr1(1) = '0' and read_addr1(0) = '0'));
+      read_addr1_v := conv_integer(read_addr1);
+
       if read_addr1(3) = '0' then
-         read_data1 <= LowerRegisterWindow(sel_rbank_i + read_addr1_i);
-      elsif is_upper_register_rd1 then
-         read_data1 <= UpperRegisters(read_addr1_i);
+         read_data1 <= LowerRegisterWindow(sel_rbank_i + read_addr1_v);
+      elsif is_upper_register_rd1_v then
+         read_data1 <= UpperRegisters(read_addr1_v);
       else
-         read_data1 <= SpecialRegisters(read_addr1_i); 
+         read_data1 <= SpecialRegisters(read_addr1_v);
       end if;   
    end process;
    
-   read_register2 : process(sel_rbank_i, read_addr2, read_addr2_i, is_upper_register_rd2, LowerRegisterWindow, UpperRegisters, SpecialRegisters)
+   read_register2 : process(sel_rbank_i, read_addr2, LowerRegisterWindow, UpperRegisters, SpecialRegisters)
+     variable is_upper_register_rd2_v : boolean;
+     variable read_addr2_v : integer range 0 to 15;
    begin
+      is_upper_register_rd2_v := read_addr2(3) = '1' and
+        (read_addr2(2) = '0' or (read_addr2(1) = '0' and read_addr2(0) = '0'));
+      read_addr2_v := conv_integer(read_addr2);
+
       if read_addr2(3) = '0' then
-         read_data2 <= LowerRegisterWindow(sel_rbank_i + read_addr2_i);
-      elsif is_upper_register_rd2 then
-         read_data2 <= UpperRegisters(read_addr2_i);
+         read_data2 <= LowerRegisterWindow(sel_rbank_i + read_addr2_v);
+      elsif is_upper_register_rd2_v then
+         read_data2 <= UpperRegisters(read_addr2_v);
       else
-         read_data2 <= SpecialRegisters(read_addr2_i);
+         read_data2 <= SpecialRegisters(read_addr2_v);
       end if;
    end process;   
 

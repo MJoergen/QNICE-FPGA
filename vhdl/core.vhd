@@ -36,7 +36,7 @@ entity core is
     ps2_dat_i            : in    std_logic;
 
     -- Interface to VGA driver
-    vga_en_o             : out   std_logic;
+    vga_en_o             : buffer std_logic;
     vga_we_o             : out   std_logic;
     vga_reg_o            : out   std_logic_vector(4 downto 0);
     vga_wr_data_o        : out   std_logic_vector(15 downto 0);
@@ -56,6 +56,9 @@ entity core is
 end entity core;
 
 architecture rtl of core is
+
+  signal hw_reset           : std_logic; -- asynchronous, active high
+  signal rst                : std_logic; -- synchronous, active high
 
   -- CPU control signals
   signal cpu_addr           : std_logic_vector(15 downto 0);
@@ -127,6 +130,8 @@ architecture rtl of core is
 
 begin
 
+  rst_o <= rst;
+
   vga_wr_data_o <= cpu_data_out;
 
   -- Merge data outputs from all devices into a single data input to the CPU.
@@ -150,7 +155,7 @@ begin
   cpu : entity work.qnice_cpu
     port map (
       clk            => clk_i,
-      reset          => rst_o,
+      reset          => rst,
       wait_for_data  => cpu_wait_for_data,
       addr           => cpu_addr,
       data_in        => cpu_data_in,
@@ -207,7 +212,7 @@ begin
   til_leds : entity work.til_display
     port map (
       clk             => clk_i,
-      reset           => rst_o,
+      reset           => rst,
       til_reg0_enable => i_til_reg0_enable,
       til_reg1_enable => til_reg1_enable,
       data_in         => i_til_data_in,
@@ -219,7 +224,7 @@ begin
   uart : entity work.bus_uart
     port map (
       clk          => clk_i,
-      reset        => rst_o,
+      reset        => rst,
       fast         => switches_i(3),
       rx           => uart_rxd_i,
       tx           => uart_txd_o,
@@ -237,7 +242,7 @@ begin
   kbd : entity work.keyboard
     port map (
       clk          => clk_i,
-      reset        => rst_o,
+      reset        => rst,
       ps2_clk      => ps2_clk_i,
       ps2_data     => ps2_dat_i,
       kbd_en       => kbd_en,
@@ -253,7 +258,7 @@ begin
     )
     port map (
       clk         => clk_i,
-      reset       => rst_o,
+      reset       => rst,
       int_n_out   => vga_right_int_n_o,
       grant_n_in  => vga_right_igrant_n_i,
       int_n_in    => '1',
@@ -270,7 +275,7 @@ begin
     port map (
       clk      => clk_i,
       impulse  => '1',
-      reset    => rst_o,
+      reset    => rst,
       en       => cyc_en,
       we       => cyc_we,
       reg      => cyc_reg,
@@ -283,7 +288,7 @@ begin
     port map (
       clk      => clk_i,
       impulse  => cpu_ins_cnt_strobe,
-      reset    => rst_o,
+      reset    => rst,
       en       => ins_en,
       we       => ins_we,
       reg      => ins_reg,
@@ -295,7 +300,7 @@ begin
   eae_inst : entity work.eae
     port map (
       clk      => clk_i,
-      reset    => rst_o,
+      reset    => rst,
       en       => eae_en,
       we       => eae_we,
       reg      => eae_reg,
@@ -307,7 +312,7 @@ begin
   sys_inst : entity work.sysinfo
     port map (
       clk      => clk_i,
-      reset    => rst_o,
+      reset    => rst,
       en       => sys_en,
       we       => sys_we,
       reg      => sys_reg,
@@ -319,7 +324,7 @@ begin
   sd_card : entity work.sdcard
     port map (
       clk      => clk_i,
-      reset    => rst_o,
+      reset    => rst,
       en       => sd_en,
       we       => sd_we,
       reg      => sd_reg,
@@ -334,7 +339,7 @@ begin
   interrupt_controller : entity work.interrupt_controller
     port map (
       clk_i     => clk_i,
-      rst_i     => rst_o,
+      rst_i     => rst,
       en_i      => int_en,
       we_i      => int_we,
       reg_i     => int_reg,
@@ -347,6 +352,7 @@ begin
     );
 
   -- memory mapped i/o controller
+  hw_reset <= not reset_n_i;
   mmio_controller : entity work.mmio_mux
     generic map (
       GD_PORE     => true, -- yes, use PORE system
@@ -355,7 +361,7 @@ begin
       GD_HRAM     => false -- no, do not support HyperRAM
     )
     port map (
-      hw_reset          => not reset_n_i,
+      hw_reset          => hw_reset,
       clk               => clk_i, -- @TODO change debouncer bitsize when going to 100 MHz
       addr              => cpu_addr,
       data_dir          => cpu_data_dir,
@@ -403,7 +409,7 @@ begin
       sd_en             => sd_en,
       sd_we             => sd_we,
       sd_reg            => sd_reg,
-      reset_ctl         => rst_o,
+      reset_ctl         => rst,
       reset_pre_pore    => open,
       reset_post_pore   => open,
 

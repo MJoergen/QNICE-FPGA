@@ -1157,7 +1157,9 @@ begin
 								-- If we're ok to transfer data, then do it
 								-- otherwise wait here until dout_taken rises
 								set_davail <= true;
-								new_byte_counter <= byte_counter - 1; set_byte_counter <= true;
+                if byte_counter > 0 then
+                  new_byte_counter <= byte_counter - 1; set_byte_counter <= true;
+                end if;
 								-- Next byte
 								new_bit_counter <= 7;
 								if byte_counter=1 then
@@ -1169,7 +1171,9 @@ begin
 							end if;
 						else
 							-- Abort transfer
-							new_byte_counter <= byte_counter - 1; set_byte_counter <= true;
+              if byte_counter > 0 then
+                new_byte_counter <= byte_counter - 1; set_byte_counter <= true;
+              end if;
 							-- Next byte
 							new_bit_counter <= 7;
 							if byte_counter=1 then
@@ -1182,7 +1186,9 @@ begin
 					else
 						new_bit_counter <= 7;
 						new_state <= sr_return_state;
-						new_byte_counter <= byte_counter - 1; set_byte_counter <= true;
+            if byte_counter > 0 then
+              new_byte_counter <= byte_counter - 1; set_byte_counter <= true;
+            end if;
 					end if;
 				else
 					new_bit_counter <= bit_counter - 1;

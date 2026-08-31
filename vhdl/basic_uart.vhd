@@ -52,7 +52,7 @@ architecture rtl of basic_uart is
       end record;
 
    signal rx_state,rx_state_next : rx_state_t;
-   signal tx_state,tx_state_next : tx_state_t;
+   signal tx_state,tx_state_next : tx_state_t := (IDLE_ST, (others => '0'), (others => '1'), (others => '0'), '1');
 
 --   attribute mark_debug             : boolean;
 --   attribute mark_debug of rx_state : signal is true;

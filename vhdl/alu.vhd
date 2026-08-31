@@ -46,13 +46,15 @@ signal r_sub : unsigned(16 downto 0);
 signal shifter_result : unsigned(15 downto 0);
 signal shifter_c_out : std_logic;
 signal shifter_x_out : std_logic;
+signal shifter_dir   : std_logic;
 
 begin
 
+   shifter_dir <= not opcode(3) and opcode(2) and opcode(1) and not opcode(0); -- SHR opcode = 0110
    shifter : entity work.alu_shifter
       port map
       (
-         dir => not opcode(3) and opcode(2) and opcode(1) and not opcode(0), -- SHR opcode = 0110
+         dir => shifter_dir,
          input1 => input1,
          input2 => input2,
          c_in => c_in,
