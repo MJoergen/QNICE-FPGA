@@ -21,40 +21,40 @@ library unisim;
 
 entity env1 is
   port (
-    clk       : in    std_logic;                     -- 100 MHz clock
-    reset_n   : in    std_logic;                     -- CPU reset button (negative, i.e. 0 = reset)
+    clk_i       : in    std_logic;                     -- 100 MHz clock
+    reset_n_i   : in    std_logic;                     -- CPU reset button (negative, i.e. 0 = reset)
 
     -- 7 segment display: common anode and cathode
-    sseg_an   : out   std_logic_vector(7 downto 0);  -- common anode: selects digit
-    sseg_ca   : out   std_logic_vector(7 downto 0);  -- cathode: selects segment within a digit
+    sseg_an_o   : out   std_logic_vector(7 downto 0);  -- common anode: selects digit
+    sseg_ca_o   : out   std_logic_vector(7 downto 0);  -- cathode: selects segment within a digit
 
     -- serial communication
-    uart_rxd  : in    std_logic;                     -- receive data
-    uart_txd  : out   std_logic;                     -- send data
-    uart_rts  : in    std_logic;                     -- (active low) equals cts from dte, i.e. fpga is allowed to send to dte
-    uart_cts  : out   std_logic;                     -- (active low) clear to send (dte is allowed to send to fpga)
+    uart_rxd_i  : in    std_logic;                     -- receive data
+    uart_txd_o  : out   std_logic;                     -- send data
+    uart_rts_i  : in    std_logic;                     -- (active low) equals cts from dte, i.e. fpga is allowed to send to dte
+    uart_cts_o  : out   std_logic;                     -- (active low) clear to send (dte is allowed to send to fpga)
 
     -- switches and LEDs
-    switches  : in    std_logic_vector(15 downto 0); -- 16 on/off "dip" switches
-    leds      : out   std_logic_vector(15 downto 0); -- 16 LEDs
+    switches_i  : in    std_logic_vector(15 downto 0); -- 16 on/off "dip" switches
+    leds_o      : out   std_logic_vector(15 downto 0); -- 16 LEDs
 
     -- PS/2 keyboard
-    ps2_clk   : in    std_logic;
-    ps2_dat   : in    std_logic;
+    ps2_clk_i   : in    std_logic;
+    ps2_dat_i   : in    std_logic;
 
     -- VGA
-    vga_red   : out   std_logic_vector(3 downto 0);
-    vga_green : out   std_logic_vector(3 downto 0);
-    vga_blue  : out   std_logic_vector(3 downto 0);
-    vga_hs    : out   std_logic;
-    vga_vs    : out   std_logic;
+    vga_red_o   : out   std_logic_vector(3 downto 0);
+    vga_green_o : out   std_logic_vector(3 downto 0);
+    vga_blue_o  : out   std_logic_vector(3 downto 0);
+    vga_hs_o    : out   std_logic;
+    vga_vs_o    : out   std_logic;
 
     -- SD Card
-    sd_reset  : out   std_logic;
-    sd_clk    : out   std_logic;
-    sd_mosi   : out   std_logic;
-    sd_miso   : in    std_logic;
-    sd_dat    : out   std_logic_vector(3 downto 1)
+    sd_reset_o  : out   std_logic;
+    sd_clk_o    : out   std_logic;
+    sd_mosi_o   : out   std_logic;
+    sd_miso_i   : in    std_logic;
+    sd_dat_o    : out   std_logic_vector(3 downto 1)
   );
 end entity env1;
 
@@ -146,10 +146,6 @@ architecture beh of env1 is
   -- Have a look at hw/README.md "General advise for porting"
   signal clk25mhz : std_logic   := '0';
 
-  -- MMCME related signals
-  signal clk_fb_main     : std_logic;
-  signal pll_locked_main : std_logic;
-
   signal reset_ctl : std_logic;
 
   -- enable displaying of address bus on system halt, if switch 2 is on
@@ -177,7 +173,7 @@ begin
 
   i_clk : entity work.clk
     port map (
-      sys_clk_i  => clk,
+      sys_clk_i  => clk_i,
       clk25mhz_o => clk25mhz,
       clk50mhz_o => slow_clock
     );
@@ -263,11 +259,11 @@ begin
 
   -- wire the simplified color system of the VGA component to the VGA outputs.
   -- Convert from 15-bit to 12-bit by discarding the LSB of each color channel.
-  vga_red   <= vga_color(14 downto 11);
-  vga_green <= vga_color(9 downto 6);
-  vga_blue  <= vga_color(4 downto 1);
-  vga_hs    <= vga_hsync;
-  vga_vs    <= vga_vsync;
+  vga_red_o   <= vga_color(14 downto 11);
+  vga_green_o <= vga_color(9 downto 6);
+  vga_blue_o  <= vga_color(4 downto 1);
+  vga_hs_o    <= vga_hsync;
+  vga_vs_o    <= vga_vsync;
 
   -- TIL display emulation (4 digits)
   til_leds : entity work.til_display
@@ -277,8 +273,8 @@ begin
       til_reg0_enable => i_til_reg0_enable,
       til_reg1_enable => til_reg1_enable,
       data_in         => i_til_data_in,
-      sseg_an         => sseg_an,
-      sseg_ca         => sseg_ca
+      sseg_an         => sseg_an_o,
+      sseg_ca         => sseg_ca_o
     );
 
   -- special UART with FIFO that can be directly connected to the CPU bus
@@ -286,11 +282,11 @@ begin
     port map (
       clk          => slow_clock,
       reset        => reset_ctl,
-      fast         => switches(3),
-      rx           => uart_rxd,
-      tx           => uart_txd,
-      rts          => uart_rts,
-      cts          => uart_cts,
+      fast         => switches_i(3),
+      rx           => uart_rxd_i,
+      tx           => uart_txd_o,
+      rts          => uart_rts_i,
+      cts          => uart_cts_o,
       uart_en      => uart_en,
       uart_we      => uart_we,
       uart_reg     => uart_reg,
@@ -304,8 +300,8 @@ begin
     port map (
       clk          => slow_clock,
       reset        => reset_ctl,
-      ps2_clk      => ps2_clk,
-      ps2_data     => ps2_dat,
+      ps2_clk      => ps2_clk_i,
+      ps2_data     => ps2_dat_i,
       kbd_en       => kbd_en,
       kbd_we       => kbd_we,
       kbd_reg      => kbd_reg,
@@ -391,10 +387,10 @@ begin
       reg      => sd_reg,
       data_in  => cpu_data_out,
       data_out => sd_data_out,
-      sd_reset => sd_reset,
-      sd_clk   => sd_clk,
-      sd_mosi  => sd_mosi,
-      sd_miso  => sd_miso
+      sd_reset => sd_reset_o,
+      sd_clk   => sd_clk_o,
+      sd_mosi  => sd_mosi_o,
+      sd_miso  => sd_miso_i
     );
 
   interrupt_controller : entity work.interrupt_controller
@@ -421,7 +417,7 @@ begin
       GD_HRAM     => false -- no, do not support HyperRAM
     )
     port map (
-      hw_reset          => not reset_n,
+      hw_reset          => not reset_n_i,
       clk               => slow_clock, -- @TODO change debouncer bitsize when going to 100 MHz
       addr              => cpu_addr,
       data_dir          => cpu_data_dir,
@@ -469,7 +465,7 @@ begin
       sd_en             => sd_en,
       sd_we             => sd_we,
       sd_reg            => sd_reg,
-      reset_ctl         => reset_ctl,
+      reset_ctl         => reset_ctl, -- output
       reset_pre_pore    => open,
       reset_post_pore   => open,
 
@@ -481,10 +477,10 @@ begin
     );
 
   -- emulate the toggle switches as described in doc/README.md
-  switch_driver : process (switch_reg_enable, switches)
+  switch_driver : process (switch_reg_enable, switches_i)
   begin
     if switch_reg_enable = '1' then
-      switch_data_out <= switches;
+      switch_data_out <= switches_i;
     else
       switch_data_out <= (others => '0');
     end if;
@@ -493,15 +489,15 @@ begin
   -- debug mode handling: if switch 2 is on then:
   --   show the current cpu address in realtime on the LEDs
   --   on halt show the PC of the HALT command (aka address bus value) on TIL
-  debug_mode_handler : process (switches, cpu_addr, cpu_data_out, cpu_halt, til_reg0_enable)
+  debug_mode_handler : process (switches_i, cpu_addr, cpu_data_out, cpu_halt, til_reg0_enable)
   begin
     i_til_reg0_enable <= til_reg0_enable;
     i_til_data_in     <= cpu_data_out;
-    leds              <= cpu_halt & "000000000000000";
+    leds_o            <= cpu_halt & "000000000000000";
 
     -- debug mode
-    if switches(2) = '1' then
-      leds <= cpu_addr;
+    if switches_i(2) = '1' then
+      leds_o <= cpu_addr;
 
       if cpu_halt = '1' then
         i_til_reg0_enable <= '1';
@@ -511,7 +507,7 @@ begin
   end process debug_mode_handler;
 
   -- pull DAT1, DAT2 and DAT3 to GND (Nexys' pull-ups by default pull to VDD)
-  sd_dat <= "000";
+  sd_dat_o <= "000";
 
 end architecture beh;
 
