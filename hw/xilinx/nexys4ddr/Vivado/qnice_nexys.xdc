@@ -8,19 +8,19 @@ create_clock -period 10.000 -name clk [get_ports clk_i]
 ## Handle the Clock Domain Crossing
 ## Any register wrapped inside a generate statement with the name `gen_cdc`
 ## will be considered part of a Clock Domain Crossing.
-set_false_path -from [get_clocks -of_objects [get_pins i_clk/i_mmcme2_adv/CLKOUT0]] \
+set_false_path -from [get_clocks -of_objects [get_pins clk_inst/i_mmcme2_adv/CLKOUT0]] \
                -to [get_pins -hierarchical {*gen_cdc.*/D}]
-set_false_path -from [get_clocks -of_objects [get_pins i_clk/i_mmcme2_adv/CLKOUT1]] \
+set_false_path -from [get_clocks -of_objects [get_pins clk_inst/i_mmcme2_adv/CLKOUT1]] \
                -to [get_pins -hierarchical {*gen_cdc.*/D}]
 
 ## EAE's combinatorial division networks take longer than
 ## the regular clock period, so we specify a multicycle path
 ## see also the comments in EAE.vhd and explanations in UG903/chapter 5/Multicycle Paths as well as ug911/page 25
-set_multicycle_path -from [get_cells {{eae_inst/op0_reg*} {eae_inst/op1_reg*}}] -to [get_cells {eae_inst/res_reg[*]}] -setup 3
-set_multicycle_path -from [get_cells {{eae_inst/op0_reg*} {eae_inst/op1_reg*}}] -to [get_cells {eae_inst/res_reg[*]}] -hold 2
+set_multicycle_path -from [get_cells {{core_inst/eae_inst/op0_reg*} {core_inst/eae_inst/op1_reg*}}] -to [get_cells {core_inst/eae_inst/res_reg[*]}] -setup 3
+set_multicycle_path -from [get_cells {{core_inst/eae_inst/op0_reg*} {core_inst/eae_inst/op1_reg*}}] -to [get_cells {core_inst/eae_inst/res_reg[*]}] -hold 2
 
 ## The following set_max delay works fine, too at 50 MHz main clock and is an alternative to the multicycle path
-#set_max_delay -from [get_cells {{eae_inst/op0_reg[*]} {eae_inst/op1_reg[*]}}] -to [get_cells {eae_inst/res_reg[*]}] 34.000
+#set_max_delay -from [get_cells {{core_inst/eae_inst/op0_reg[*]} {core_inst/eae_inst/op1_reg[*]}}] -to [get_cells {core_inst/eae_inst/res_reg[*]}] 34.000
 
 ## Reset button
 set_property -dict {PACKAGE_PIN C12 IOSTANDARD LVCMOS33} [get_ports reset_n_i]
