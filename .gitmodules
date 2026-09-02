@@ -1,0 +1,3 @@
+[submodule "qnice_cpu"]
+	path = qnice_cpu
+	url = https://github.com/MJoergen/qnice_cpu.git
