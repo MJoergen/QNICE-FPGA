@@ -118,6 +118,7 @@ port (
    hram_cpu_ws       : in std_logic; -- insert CPU wait states (aka WAIT_FOR_DATA)   
  
    -- global state and reset management
+   use_pore_rom      : out std_logic;
    reset_pre_pore    : buffer std_logic;
    reset_post_pore   : buffer std_logic;
    reset_ctl         : out std_logic  
@@ -342,6 +343,7 @@ begin
    ram_enable <= ram_enable_i;
    rom_enable <= rom_enable_i;
    pore_rom_enable <= pore_rom_enable_i;
+   use_pore_rom <= use_pore_rom_i;
    
    -- generate external reset signals
    reset_pre_pore <= '1' when (global_state = gsPowerOn or global_state = gsReset or global_state = gsReset_execute) else '0';

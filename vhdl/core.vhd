@@ -79,6 +79,7 @@ architecture rtl of core is
   signal ram_enable        : std_logic;
   signal ram_busy          : std_logic;
   signal ram_data_out      : std_logic_vector(15 downto 0);
+  signal use_pore_rom      : std_logic;
   signal pore_rom_enable   : std_logic;
   signal pore_rom_busy     : std_logic;
   signal pore_rom_data_out : std_logic_vector(15 downto 0);
@@ -263,7 +264,7 @@ begin
     ); -- dp_ram_inst
 
   rom_a_addr    <= cpu_wbi_addr(14 downto 0);
-  rom_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb;
+  rom_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb and not cpu_wbi_addr(15) and not use_pore_rom;
   rom_b_addr    <= cpu_wbd_addr(14 downto 0);
   rom_b_rd_en   <= cpu_wbd_cyc and cpu_wbd_stb and not cpu_wbd_we and rom_enable;
 
@@ -299,7 +300,7 @@ begin
     ); -- dp_ram_inst
 
   ram_a_addr    <= cpu_wbi_addr(14 downto 0);
-  ram_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb;
+  ram_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb and cpu_wbi_addr(15) when cpu_wbi_addr(15 downto 8) /= X"FF" else '0';
   ram_b_addr    <= cpu_wbd_addr(14 downto 0);
   ram_b_rd_en   <= cpu_wbd_cyc and cpu_wbd_stb and not cpu_wbd_we and ram_enable;
   ram_b_wr_en   <= cpu_wbd_cyc and cpu_wbd_stb and cpu_wbd_we and ram_enable;
@@ -338,7 +339,7 @@ begin
     ); -- dp_ram_inst
 
   pore_rom_a_addr    <= cpu_wbi_addr(14 downto 0);
-  pore_rom_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb;
+  pore_rom_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb and not cpu_wbi_addr(15) and use_pore_rom;
   pore_rom_b_addr    <= cpu_wbd_addr(14 downto 0);
   pore_rom_b_rd_en   <= cpu_wbd_cyc and cpu_wbd_stb and not cpu_wbd_we and pore_rom_enable;
 
@@ -551,6 +552,7 @@ begin
       sd_en             => sd_en,
       sd_we             => sd_we,
       sd_reg            => sd_reg,
+      use_pore_rom      => use_pore_rom,
       reset_ctl         => rst,
       reset_pre_pore    => open,
       reset_post_pore   => open,
