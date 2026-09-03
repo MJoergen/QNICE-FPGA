@@ -62,7 +62,6 @@ architecture beh of env1 is
 
   -- CPU control signals
   signal cpu_addr           : std_logic_vector(15 downto 0);
-  signal cpu_data_in        : std_logic_vector(15 downto 0);
   signal cpu_data_out       : std_logic_vector(15 downto 0);
   signal cpu_data_dir       : std_logic;
   signal cpu_data_valid     : std_logic;
@@ -83,6 +82,7 @@ architecture beh of env1 is
   signal ram_enable        : std_logic;
   signal ram_busy          : std_logic;
   signal ram_data_out      : std_logic_vector(15 downto 0);
+  signal use_pore_rom      : std_logic;
   signal pore_rom_enable   : std_logic;
   signal pore_rom_busy     : std_logic;
   signal pore_rom_data_out : std_logic_vector(15 downto 0);
@@ -156,14 +156,70 @@ architecture beh of env1 is
   signal i_til_reg0_enable : std_logic;
   signal i_til_data_in     : std_logic_vector(15 downto 0);
 
+  -- CPU instruction memory bus
+  signal cpu_wbi_cyc     : std_logic;
+  signal cpu_wbi_stb     : std_logic;
+  signal cpu_wbi_stall   : std_logic;
+  signal cpu_wbi_addr    : std_logic_vector(15 downto 0);
+  signal cpu_wbi_ack     : std_logic;
+  signal cpu_wbi_rd_data : std_logic_vector(15 downto 0);
+
+  -- CPU data memory bus
+  signal cpu_wbd_cyc     : std_logic;
+  signal cpu_wbd_stb     : std_logic;
+  signal cpu_wbd_stall   : std_logic;
+  signal cpu_wbd_addr    : std_logic_vector(15 downto 0);
+  signal cpu_wbd_addr_d  : std_logic_vector(15 downto 0);
+  signal cpu_wbd_we      : std_logic;
+  signal cpu_wbd_wr_dat  : std_logic_vector(15 downto 0);
+  signal cpu_wbd_ack     : std_logic;
+  signal cpu_wbd_rd_data : std_logic_vector(15 downto 0);
+
+  -- Outputs from memory and I/O devices
+  signal pore_rom_inst_out : std_logic_vector(15 downto 0);
+  signal rom_inst_out      : std_logic_vector(15 downto 0);
+  signal ram_inst_out      : std_logic_vector(15 downto 0);
+  signal io_data_out       : std_logic_vector(15 downto 0);
+
+  signal pore_rom_a_addr    : std_logic_vector(14 downto 0);
+  signal pore_rom_a_rd_en   : std_logic;
+  signal pore_rom_a_rd_data : std_logic_vector(15 downto 0);
+  signal pore_rom_b_addr    : std_logic_vector(14 downto 0);
+  signal pore_rom_b_rd_en   : std_logic;
+  signal pore_rom_b_rd_data : std_logic_vector(15 downto 0);
+  signal pore_rom_a_rd_en_d : std_logic;
+  signal pore_rom_b_rd_en_d : std_logic;
+
+  signal rom_a_addr      : std_logic_vector(14 downto 0);
+  signal rom_a_rd_en     : std_logic;
+  signal rom_a_rd_data   : std_logic_vector(15 downto 0);
+  signal rom_b_addr      : std_logic_vector(14 downto 0);
+  signal rom_b_rd_en     : std_logic;
+  signal rom_b_rd_data   : std_logic_vector(15 downto 0);
+  signal rom_a_rd_en_d   : std_logic;
+  signal rom_b_rd_en_d   : std_logic;
+
+  signal ram_a_addr      : std_logic_vector(14 downto 0);
+  signal ram_a_rd_en     : std_logic;
+  signal ram_a_rd_data   : std_logic_vector(15 downto 0);
+  signal ram_b_addr      : std_logic_vector(14 downto 0);
+  signal ram_b_rd_en     : std_logic;
+  signal ram_b_rd_data   : std_logic_vector(15 downto 0);
+  signal ram_b_wr_en     : std_logic;
+  signal ram_b_wr_data   : std_logic_vector(15 downto 0);
+  signal ram_a_rd_en_d   : std_logic;
+  signal ram_b_rd_en_d   : std_logic;
+
 begin
 
   -- Merge data outputs from all devices into a single data input to the CPU.
   -- This requires that all devices output 0's when not selected.
-  cpu_data_in <= pore_rom_data_out or
-                 rom_data_out      or
-                 ram_data_out      or
-                 switch_data_out   or
+  --
+  -- Here we have added a "rising_edge" to ensure the data read from I/O devices
+  -- are properly registered (i.e. delayed one clock cycle).
+  -- Furthermore, we've removed the RAM and ROM, because their outputs are
+  -- already registered.
+  io_data_out <= switch_data_out   or
                  kbd_data_out      or
                  vga_data_out      or
                  uart_data_out     or
@@ -173,7 +229,25 @@ begin
                  eae_data_out      or
                  sd_data_out       or
                  int_data_out      or
-                 sys_data_out;
+                 sys_data_out
+                 when rising_edge(slow_clock);
+
+  -- Memory map of instruction memory bus (handled here)
+  -- 0x0000 - 0x7FFF : ROM / PORE_ROM
+  -- 0x8000 - 0xFFFF : RAM
+  --
+  -- Memory map of data memory bus (handled in mmio_mux.vhd)
+  -- 0x0000 - 0x7FFF : ROM / PORE_ROM
+  -- 0x8000 - 0xFEFF : RAM
+  -- 0xFF00 - 0xFFFF : I/O
+  --
+  -- Dual-Port memory is used for ROM/RAM.
+  -- Port A is for instruction memory
+  -- Port B is for data memory
+  -- Both read ports are registered
+  cpu_wbi_rd_data <= ram_inst_out or rom_inst_out or pore_rom_inst_out;
+  cpu_wbd_rd_data <= ram_data_out or rom_data_out or pore_rom_data_out or io_data_out;
+
 
   i_clk : entity work.clk
     port map (
@@ -182,62 +256,176 @@ begin
       clk50mhz_o => slow_clock
     );
 
-  -- QNICE CPU
-  cpu : entity work.qnice_cpu
-    port map (
-      clk            => slow_clock,
-      reset          => reset_ctl,
-      wait_for_data  => cpu_wait_for_data,
-      addr           => cpu_addr,
-      data_in        => cpu_data_in,
-      data_out       => cpu_data_out,
-      data_dir       => cpu_data_dir,
-      data_valid     => cpu_data_valid,
-      halt           => cpu_halt,
-      ins_cnt_strobe => cpu_ins_cnt_strobe,
-      int_n          => cpu_int_n,
-      igrant_n       => cpu_igrant_n
-    );
 
-  -- ROM: up to 64kB consisting of up to 32.000 16 bit words
-  rom : entity work.brom
+  -- QNICE CPU
+  cpu_inst : entity work.cpu
     generic map (
-      FILE_NAME => ROM_FILE
+      G_WRITES_FILE         => "", -- only used in simulation
+      G_REGISTER_BANK_WIDTH => 8
     )
     port map (
-      clk     => slow_clock,
-      ce      => rom_enable,
-      address => cpu_addr(14 downto 0),
-      data    => rom_data_out,
-      busy    => rom_busy
-    );
+      clk_i       => slow_clock,
+      rst_i       => reset_ctl,
+      wbi_cyc_o   => cpu_wbi_cyc,
+      wbi_stb_o   => cpu_wbi_stb,
+      wbi_stall_i => cpu_wbi_stall,
+      wbi_addr_o  => cpu_wbi_addr,
+      wbi_ack_i   => cpu_wbi_ack,
+      wbi_data_i  => cpu_wbi_rd_data,
+      wbd_cyc_o   => cpu_wbd_cyc,
+      wbd_stb_o   => cpu_wbd_stb,
+      wbd_stall_i => cpu_wbd_stall,
+      wbd_addr_o  => cpu_wbd_addr,
+      wbd_we_o    => cpu_wbd_we,
+      wbd_dat_o   => cpu_wbd_wr_dat,
+      wbd_ack_i   => cpu_wbd_ack,
+      wbd_data_i  => cpu_wbd_rd_data,
+      inst_done_o => cpu_ins_cnt_strobe,
+      halt_o      => cpu_halt
+    ); -- cpu_inst
+
+  -- Both Instruction and data memory buses always accept the request without
+  -- delay.
+  cpu_wbi_stall   <= '0';
+  cpu_wbd_stall   <= '0';
+
+  -- Instruction memory always responds with read data on the following clock
+  -- cycle.
+  -- Data memory may hold back read data indefinitely.
+  cpu_wbi_ack     <= cpu_wbi_cyc and cpu_wbi_stb when rising_edge(slow_clock);
+  cpu_wbd_ack     <= not cpu_wait_for_data       when rising_edge(slow_clock);
+
+  -- The Wishbone protocol is transaction based, which means the cpu_wbd_addr
+  -- signal is only valid when cpu_wbd_stb is asserted. However, the I/O devices
+  -- expect the CPU address to be valid in every clock cycle. So, we add a
+  -- register here to hold the last valid value.
+  cpu_wbd_addr_proc : process (slow_clock)
+  begin
+     if rising_edge(slow_clock) then
+        if cpu_wbd_stb = '1' then
+           cpu_wbd_addr_d <= cpu_wbd_addr;
+        end if;
+     end if;
+  end process cpu_wbd_addr_proc;
+
+  cpu_addr       <= cpu_wbd_addr when cpu_wbd_stb = '1' else cpu_wbd_addr_d;
+  cpu_data_out   <= cpu_wbd_wr_dat;
+  cpu_data_dir   <= cpu_wbd_cyc and cpu_wbd_stb and cpu_wbd_we and not cpu_wbd_stall;
+  cpu_data_valid <= '1';
+  cpu_igrant_n   <= '1'; -- TBD: Interrupt support not yet implemented
+
+
+  -- ROM: up to 64kB consisting of up to 32.000 16 bit words
+  rom_inst : entity work.dp_ram
+    generic map (
+      G_INIT_FILE => ROM_FILE,
+      G_RAM_STYLE => "block",
+      G_B_READ    => true,
+      G_ADDR_SIZE => 15,
+      G_DATA_SIZE => 16
+    )
+    port map (
+      clk_i       => slow_clock,
+      rst_i       => '0',
+      a_addr_i    => rom_a_addr,
+      a_rd_en_i   => rom_a_rd_en,
+      a_rd_data_o => rom_a_rd_data,
+      b_addr_i    => rom_b_addr,
+      b_rd_en_i   => rom_b_rd_en,
+      b_rd_data_o => rom_b_rd_data,
+      b_wr_en_i   => '0',
+      b_wr_data_i => (others => '0')
+    ); -- dp_ram_inst
+
+  rom_a_addr    <= cpu_wbi_addr(14 downto 0);
+  rom_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb and not cpu_wbi_addr(15) and not use_pore_rom;
+  rom_b_addr    <= cpu_wbd_addr(14 downto 0);
+  rom_b_rd_en   <= cpu_wbd_cyc and cpu_wbd_stb and not cpu_wbd_we and rom_enable;
+
+  rom_a_rd_en_d <= rom_a_rd_en when rising_edge(slow_clock);
+  rom_b_rd_en_d <= rom_b_rd_en when rising_edge(slow_clock);
+
+  -- ROM output must be zero when not accessed
+  rom_inst_out <= rom_a_rd_data when rom_a_rd_en_d = '1' else X"0000";
+  rom_data_out <= rom_b_rd_data when rom_b_rd_en_d = '1' else X"0000";
+  rom_busy     <= '0';
+
 
   -- RAM: up to 64kB consisting of up to 32.000 16 bit words
-  ram : entity work.bram
+  dp_ram_inst : entity work.dp_ram
+    generic map (
+      G_INIT_FILE => "",
+      G_RAM_STYLE => "block",
+      G_B_READ    => true,
+      G_ADDR_SIZE => 15,
+      G_DATA_SIZE => 16
+    )
     port map (
-      clk     => slow_clock,
-      ce      => ram_enable,
-      address => cpu_addr(14 downto 0),
-      we      => cpu_data_dir,
-      data_i  => cpu_data_out,
-      data_o  => ram_data_out,
-      busy    => ram_busy
-    );
+      clk_i       => slow_clock,
+      rst_i       => '0',
+      a_addr_i    => ram_a_addr,
+      a_rd_en_i   => ram_a_rd_en,
+      a_rd_data_o => ram_a_rd_data,
+      b_addr_i    => ram_b_addr,
+      b_rd_en_i   => ram_b_rd_en,
+      b_rd_data_o => ram_b_rd_data,
+      b_wr_en_i   => ram_b_wr_en,
+      b_wr_data_i => ram_b_wr_data
+    ); -- dp_ram_inst
+
+  ram_a_addr    <= cpu_wbi_addr(14 downto 0);
+  ram_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb and cpu_wbi_addr(15);
+  ram_b_addr    <= cpu_wbd_addr(14 downto 0);
+  ram_b_rd_en   <= cpu_wbd_cyc and cpu_wbd_stb and not cpu_wbd_we and ram_enable;
+  ram_b_wr_en   <= cpu_wbd_cyc and cpu_wbd_stb and cpu_wbd_we and ram_enable;
+  ram_b_wr_data <= cpu_wbd_wr_dat;
+
+  ram_a_rd_en_d <= ram_a_rd_en when rising_edge(slow_clock);
+  ram_b_rd_en_d <= ram_b_rd_en when rising_edge(slow_clock);
+
+  -- RAM output must be zero when not accessed
+  ram_inst_out <= ram_a_rd_data when ram_a_rd_en_d = '1' else X"0000";
+  ram_data_out <= ram_b_rd_data when ram_b_rd_en_d = '1' else X"0000";
+  ram_busy     <= '0';
+
 
   -- PORE ROM: Power On & Reset Execution ROM
   -- contains code that is executed during power on and/or during reset
   -- MMIO is managing the PORE process
-  pore_rom : entity work.brom
+  pore_rom_inst : entity work.dp_ram
     generic map (
-      FILE_NAME => PORE_ROM_FILE
+      G_INIT_FILE => PORE_ROM_FILE,
+      G_RAM_STYLE => "block",
+      G_B_READ    => true,
+      G_ADDR_SIZE => 15,
+      G_DATA_SIZE => 16
     )
     port map (
-      clk     => slow_clock,
-      ce      => pore_rom_enable,
-      address => cpu_addr(14 downto 0),
-      data    => pore_rom_data_out,
-      busy    => pore_rom_busy
-    );
+      clk_i       => slow_clock,
+      rst_i       => '0',
+      a_addr_i    => pore_rom_a_addr,
+      a_rd_en_i   => pore_rom_a_rd_en,
+      a_rd_data_o => pore_rom_a_rd_data,
+      b_addr_i    => pore_rom_b_addr,
+      b_rd_en_i   => pore_rom_b_rd_en,
+      b_rd_data_o => pore_rom_b_rd_data,
+      b_wr_en_i   => '0',
+      b_wr_data_i => (others => '0')
+    ); -- dp_ram_inst
+
+  pore_rom_a_addr    <= cpu_wbi_addr(14 downto 0);
+  pore_rom_a_rd_en   <= cpu_wbi_cyc and cpu_wbi_stb and not cpu_wbi_addr(15) and use_pore_rom;
+  pore_rom_b_addr    <= cpu_wbd_addr(14 downto 0);
+  pore_rom_b_rd_en   <= cpu_wbd_cyc and cpu_wbd_stb and not cpu_wbd_we and pore_rom_enable;
+
+  pore_rom_a_rd_en_d <= pore_rom_a_rd_en when rising_edge(slow_clock);
+  pore_rom_b_rd_en_d <= pore_rom_b_rd_en when rising_edge(slow_clock);
+
+  -- PORE_ROM output must be zero when not accessed
+  pore_rom_inst_out <= pore_rom_a_rd_data when pore_rom_a_rd_en_d = '1' else X"0000";
+  pore_rom_data_out <= pore_rom_b_rd_data when pore_rom_b_rd_en_d = '1' else X"0000";
+  pore_rom_busy     <= '0';
+
 
   -- VGA: 80x40 textmode VGA adaptor
   i_vga_multicolor : entity work.vga_multicolor
@@ -433,6 +621,7 @@ begin
       rom_busy          => rom_busy,
       ram_enable        => ram_enable,
       ram_busy          => ram_busy,
+      use_pore_rom      => use_pore_rom,
       pore_rom_enable   => pore_rom_enable,
       pore_rom_busy     => pore_rom_busy,
       til_reg0_enable   => til_reg0_enable,

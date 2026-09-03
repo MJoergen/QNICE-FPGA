@@ -50,6 +50,7 @@ port (
    ram_busy          : in std_logic;
    
    -- PORE ROM (PowerOn & Reset Execution ROM)
+   use_pore_rom      : out std_logic;
    pore_rom_enable   : out std_logic;
    pore_rom_busy     : in std_logic;
    
@@ -116,7 +117,7 @@ port (
    hram_we           : out std_logic;
    hram_reg          : out std_logic_vector(3 downto 0); 
    hram_cpu_ws       : in std_logic; -- insert CPU wait states (aka WAIT_FOR_DATA)   
- 
+
    -- global state and reset management
    reset_pre_pore    : buffer std_logic;
    reset_post_pore   : buffer std_logic;
@@ -342,6 +343,7 @@ begin
    ram_enable <= ram_enable_i;
    rom_enable <= rom_enable_i;
    pore_rom_enable <= pore_rom_enable_i;
+   use_pore_rom <= use_pore_rom_i;
    
    -- generate external reset signals
    reset_pre_pore <= '1' when (global_state = gsPowerOn or global_state = gsReset or global_state = gsReset_execute) else '0';

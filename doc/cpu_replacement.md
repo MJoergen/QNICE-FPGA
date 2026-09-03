@@ -1,0 +1,107 @@
+# CPU Replacement
+
+This blog will describe the effort needed to retro-fit the pipelined QNICE CPU
+(https://github.com/MJoergen/qnice_cpu.git) into this design.
+
+This will include a discussion on the changes required as well as some
+statistics and code metrics.
+
+## Changes necessary
+
+The changes revolve around the three main architectural differences:
+
+* Harvard Architecture
+* Read latency
+* Wishbone interface
+* Interrupt
+
+### Harvard Architecture
+The first very important difference is the Harvard Architecture introduced by
+the new CPU design, where the CPU has separate buses for instruction and data
+memory.  To investigate the changes required, we must first investigate the
+memory map of the QNICE FPGA repo.  Since we now have two separate memory buses,
+we must equivalently have two separate memory maps.
+
+Regarding the RAM, it of course needs to be connected to the data bus, but we
+also require the option of executing instructions straight from RAM, so there
+must be a connection from RAM to the instruction memory bus too.
+
+Regarding the ROM, it will of course be used to fetch instructions, but it also
+needs data memory bus access, to allow reading data from the ROM.
+
+We are therefore left with the requirement, that both RAM and ROM need
+connection to both instruction and data buses. This is conveniently possible
+using the Dual Port feature of the Block RAMs in the FPGA.
+
+An added complexity here is that we have both the `ROM` and the `PORE_ROM`. The
+distinction between them is controlled by the `mmio_mux.vhd` file, which also
+controls the data bus memory map. I've chosen to keep the instruction memory map
+(which is simpler) within the env1.vhd top level file, so as not to clutter the
+`mmio_mux.vhd` file. I've instead add the output signal `use_pore_rom`, which
+simply mirrors the already existing internal signal `use_pore_rom_i`.
+
+The following table shows an overview over which address regions should be
+connected to the instruction and data buses, respectively.
+
+| Address   | Use          | Instruction | Data      |
+|========== | ============ | =========== | ========= |
+| 0000-7FFF | ROM/PORE\_ROM | Yes         | Read-Only |
+| 8000-FEFF | RAM          | Yes         | Yes       |
+| FF00-FFFF | I/O          | No          | Yes       |
+
+Note: The instruction memory bus is always read-only.
+
+Note: The table above dis-allows the possibility of executing instructions
+directly from the I/O space. This choice is a non-issue in this design, but
+worth mentioning.
+
+### Read latency
+Another important change from the old to the new CPU design, is that the new
+design expects the data read to appear on the **following** clock cycle. This
+change seems easy - just add a register to the returned data. However, care must be
+taken that the data bus multiplexing (where all read data is OR'ed together) is
+still applicable.  Note: Even though this increased read latency **will**
+increase the number of clock cycles needed to execute a program. the added
+pipeline will enable a faster clock rate for the CPU. The overall effect is a
+net win, see the discussion at
+(https://github.com/MJoergen/qnice_cpu/blob/main/doc/README.md#Optimizations).
+
+### Wishbone interface
+Both memory buses use the Wishbone interface. There are several issues here:
+
+* This is a transaction based protocol, where the request is pulsed (using STB)
+  and the corresponding address (ADDR) is only valid when STB is asserted. The
+  I/O devices in particular expect the address to be valid in every clock cycle.
+  It is therefore necessary to sample-and-hold the address from a valid STB
+  pulse.
+* The request may be stalled indefinitely using the STALL signal. This is not
+  needed in the current design, and we may simple keep STALL low.
+* Both read and write requests must be acknowledge using the ACK signal. In
+  most cases the request takes only one clock cycle, and the ACK signal becomes
+  a simple one-clock-cycle delayed version of STB. However, the existing design
+  supports variable read latency using the `wait_for_data` signal. This is
+  easily handled by setting ACK to the inverted `wait_for_data`. None of the
+  existing I/O devices make use of this `wait_for_data`, so this has not been
+  tested yet. 
+  Furthermore, the new CPU design does indeed allow for a Wishbone slave (both
+  instruction memory and data memory) to continually drive ACK to 1, regardless
+  of any STB signal or active transactions.
+
+### Interrupt
+Support for interrupts is not yet implemented in the new CPU design.
+
+
+## Statistics
+
+### Current design
+The current design shows the following utilization for the `QNICE_CPU` entity.
+
+The utilization report shows:
+* Slice LUTs      = 3468
+  * LUT as Logic  = 2060
+  * LUT as Memory = 1408
+* Slice Registers =  396
+* Block RAM       =    0
+
+The new design uses:
+
