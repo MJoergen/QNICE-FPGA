@@ -32,4 +32,3 @@
 ;
 QMON$LAST_ADDR  HALT
 ;
-#include "variables.asm"

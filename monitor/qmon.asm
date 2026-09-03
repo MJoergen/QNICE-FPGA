@@ -121,7 +121,7 @@ strstr!         RBRA    STR$STRSTR, 1
 ;
 ;  The actual monitor code starts here:
 ;
-QMON$COLDSTART  AND     0x00FF, SR              ; Make sure we are in register bank 0
+;QMON$COLDSTART  AND     0x00FF, SR              ; Make sure we are in register bank 0
                 MOVE    VAR$STACK_START, SP     ; Initialize stack pointer
 
                 MOVE    IO$CYC_STATE, R0        ; start cycle counter
@@ -176,7 +176,7 @@ QMON$NEXT_CHR   RSUB    IO$GETCHAR, 1           ; Wait for a key being pressed
                                                 ; cold start does not clear
                                                 ; the screen to keep the HW
                                                 ; startup message visible
-                RBRA    QMON$COLDSTART, 1       ; Yes!
+;                RBRA    QMON$COLDSTART, 1       ; Yes!
 QMON$C_MAYBE_H  CMP     'H', R8                 ; Halt?
                 RBRA    QMON$C_MAYBE_R, !Z
 ; CONTROL/HALT:
