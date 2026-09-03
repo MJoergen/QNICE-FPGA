@@ -93,15 +93,78 @@ Support for interrupts is not yet implemented in the new CPU design.
 
 ## Statistics
 
+This section gives some metrics (based on Vivado 2023.1).
+
 ### Current design
-The current design shows the following utilization for the `QNICE_CPU` entity.
+The current design (commit b1fb36c) shows the following utilization for the `QNICE_CPU`
+entity.
 
 The utilization report shows:
-* Slice LUTs      = 3468
-  * LUT as Logic  = 2060
+
+* Slice LUTs      = 3497
+  * LUT as Logic  = 2089
   * LUT as Memory = 1408
 * Slice Registers =  396
 * Block RAM       =    0
+* Slices          = 1022
 
-The new design uses:
+Timing report (using Vivado 2023.1, Clock period 20.00 ns, frequency 50.00 MHz):
+
+* WNS      : 0.151 ns
+
+Timing report (using Vivado 2023.1, Clock period 18.75 ns, frequency 53.33 MHz):
+
+* WNS      : -0.327 ns
+
+This shows that the timing at 50 MHz is marginal, and the frequency is close to maximal.
+
+Performance: (using `mandel_perf_test.asm`)
+
+* Cycles       : 8,126,056
+* Instructions : 2,466,906
+* Wall time    : 0.163 seconds (@ 50 MHz)
+
+This gives an CPI of 3.29.
+
+### New design
+
+Note: Extra logic added to `env1.vhd` is not included here.
+
+* Slice LUTs      : 938
+*   LUT as Logic  : 914
+*   LUT as Memory :  24
+* Slice Registers : 586
+* BRAM            :   2
+* Slices          : 355
+
+A note on the BRAM usage. They contain the register banks, which use a total of 256 x 8 x
+16 bits = 4 kBytes. This should perhaps reside in a single BRAM, but since the register
+block has two read ports, data is duplicated with one read port each. This accounts for
+the 2 BRAMs.
+
+Even disregarding the register file, the new CPU uses less than half of "LUT as Logic",
+but almost twice the amount of "Slice Registers".
+
+Timing report (using Vivado 2023.1, Clock period 20.00 ns, frequency 50.00 MHz):
+
+* WNS      : 0.807 ns
+
+Timing report (using Vivado 2023.1, Clock period 13.75 ns, frequency 72.73 MHz):
+* WNS      : 0.172 ns
+
+This last clock period is close to marginal; where timing closure failed at a clock period
+of 12.50 ns.
+
+
+Performance: (using `mandel_perf_test.asm`)
+
+* Cycles       : 4,893,719
+* Instructions : 2,477,180
+* Wall time    : 0.067 seconds (@ 73 MHz)
+
+This gives an CPI of 1.98.
+
+Note: It is not yet clear, why the instruction count is not identical to the old CPU.
+
+The overall speedup in walltime is a factor of 0.163 / 0.067 = 2.4.
 
