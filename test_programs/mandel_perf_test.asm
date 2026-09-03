@@ -68,17 +68,14 @@
 ;  performs at an average of 3,86 cycles/instruction which leads to 
 ;  a system performance 12,93 MIPS.
 
-                .ORG    0xA000
+#include "../monitor/monitor.asm"
 
-                MOVE    IO$CYC_STATE, R0    ; reset hw cycle counter
+QMON$COLDSTART  MOVE    IO$CYC_STATE, R0    ; reset hw cycle counter
                 MOVE    1, @R0
                 MOVE    IO$INS_STATE, R0    ; reset hw instruction counter
                 MOVE    1, @R0
 
 #define         POINTER R12
-
-#include "../dist_kit/sysdef.asm"
-#include "../dist_kit/monitor.def"                
 
 ;
 DIVERGENT       .EQU    0x0400              ; Constant for divergence test
@@ -250,3 +247,6 @@ Z1SQUARE_HIGH   .BLOCK      1
 PERF_STR        .ASCII_W    "Overall clock cycles: "
 INS_STR         .ASCII_W    "Overall instructions: "
 SPACE_STR       .ASCII_W    " "
+
+#include "../monitor/variables.asm"
+

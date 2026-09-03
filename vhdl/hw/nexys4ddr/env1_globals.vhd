@@ -15,7 +15,7 @@ package env1_globals is
 constant SYSTEM_SPEED          : natural  := 50_000_000;
 
 -- file name and file size (in lines) of the file that is converted to the ROM located at 0x0000
-constant ROM_FILE              : string   := "../monitor/monitor.rom";
+constant ROM_FILE              : string   := "../../../test_programs/mandel_perf_test.rom";
 --constant ROM_FILE              : string   := "../demos/q-tris.rom";
 
 -- file name of file and file size (in lines) of the file containing the Power On & Reset Execution (PORE) ROM
