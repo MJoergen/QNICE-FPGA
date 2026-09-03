@@ -8,7 +8,7 @@ statistics and code metrics.
 
 ## Changes necessary
 
-The changes revolve around the three main architectural differences:
+The changes revolve around the four main architectural differences:
 
 * Harvard Architecture
 * Read latency
@@ -44,7 +44,7 @@ The following table shows an overview over which address regions should be
 connected to the instruction and data buses, respectively.
 
 | Address   | Use          | Instruction | Data      |
-|========== | ============ | =========== | ========= |
+| --------- | ------------ | ----------- | --------- |
 | 0000-7FFF | ROM/PORE\_ROM | Yes         | Read-Only |
 | 8000-FEFF | RAM          | Yes         | Yes       |
 | FF00-FFFF | I/O          | No          | Yes       |
