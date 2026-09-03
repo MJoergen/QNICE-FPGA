@@ -1,9 +1,9 @@
 # CPU Replacement
 
-This blog will describe the effort needed to retro-fit the pipelined QNICE CPU
+This document describes the effort needed to retro-fit the pipelined QNICE CPU
 (https://github.com/MJoergen/qnice_cpu.git) into this design.
 
-This will include a discussion on the changes required as well as some
+This includes a discussion on the changes required as well as some
 statistics and code metrics.
 
 ## Changes necessary
@@ -36,8 +36,8 @@ using the Dual Port feature of the Block RAMs in the FPGA.
 An added complexity here is that we have both the `ROM` and the `PORE_ROM`. The
 distinction between them is controlled by the `mmio_mux.vhd` file, which also
 controls the data bus memory map. I've chosen to keep the instruction memory map
-(which is simpler) within the env1.vhd top level file, so as not to clutter the
-`mmio_mux.vhd` file. I've instead add the output signal `use_pore_rom`, which
+(which is simpler) within the `env1.vhd` top level file, so as not to clutter the
+`mmio_mux.vhd` file. I've instead added the output signal `use_pore_rom`, which
 simply mirrors the already existing internal signal `use_pore_rom_i`.
 
 The following table shows an overview over which address regions should be
@@ -64,7 +64,8 @@ still applicable.  Note: Even though this increased read latency **will**
 increase the number of clock cycles needed to execute a program. the added
 pipeline will enable a faster clock rate for the CPU. The overall effect is a
 net win, see the discussion at
-(https://github.com/MJoergen/qnice_cpu/blob/main/doc/README.md#Optimizations).
+(https://github.com/MJoergen/qnice_cpu/blob/main/doc/README.md#Optimizations)
+under the heading "Rejected: zero-latency Wishbone slaves".
 
 ### Wishbone interface
 Both memory buses use the Wishbone interface. There are several issues here:
@@ -76,16 +77,16 @@ Both memory buses use the Wishbone interface. There are several issues here:
   pulse.
 * The request may be stalled indefinitely using the STALL signal. This is not
   needed in the current design, and we may simple keep STALL low.
-* Both read and write requests must be acknowledge using the ACK signal. In
+* Both read and write requests must be acknowledged using the ACK signal. In
   most cases the request takes only one clock cycle, and the ACK signal becomes
   a simple one-clock-cycle delayed version of STB. However, the existing design
   supports variable read latency using the `wait_for_data` signal. This is
   easily handled by setting ACK to the inverted `wait_for_data`. None of the
   existing I/O devices make use of this `wait_for_data`, so this has not been
   tested yet. 
-  Furthermore, the new CPU design does indeed allow for a Wishbone slave (both
-  instruction memory and data memory) to continually drive ACK to 1, regardless
-  of any STB signal or active transactions.
+  Furthermore, the new CPU design does indeed allow for a Wishbone slave (only those
+  connected to the data memory bus) to continually drive ACK to 1, regardless of any STB
+  signal or active transactions.
 
 ### Interrupt
 Support for interrupts is not yet implemented in the new CPU design.
@@ -124,11 +125,12 @@ Performance: (using `mandel_perf_test.asm`)
 * Instructions : 2,466,906
 * Wall time    : 0.163 seconds (@ 50 MHz)
 
-This gives an CPI of 3.29.
+This gives an Cycles Per Instruction (CPI) of 3.29.
 
 ### New design
 
-Note: Extra logic added to `env1.vhd` is not included here.
+Note: The extra logic added to `env1.vhd` is not included here. It is only a handful of
+LUTs and Registers.
 
 * Slice LUTs      : 938
 *   LUT as Logic  : 914
@@ -137,7 +139,7 @@ Note: Extra logic added to `env1.vhd` is not included here.
 * BRAM            :   2
 * Slices          : 355
 
-A note on the BRAM usage. They contain the register banks, which use a total of 256 x 8 x
+A note on the BRAM usage: They contain the register banks, which use a total of 256 x 8 x
 16 bits = 4 kBytes. This should perhaps reside in a single BRAM, but since the register
 block has two read ports, data is duplicated with one read port each. This accounts for
 the 2 BRAMs.
@@ -152,8 +154,13 @@ Timing report (using Vivado 2023.1, Clock period 20.00 ns, frequency 50.00 MHz):
 Timing report (using Vivado 2023.1, Clock period 13.75 ns, frequency 72.73 MHz):
 * WNS      : 0.172 ns
 
-This last clock period is close to marginal; where timing closure failed at a clock period
-of 12.50 ns.
+Timing report (using Vivado 2023.1, Clock period 12.50 ns, frequency 80.00 MHz):
+* WNS      : -0.467 ns (within EAE)
+* WNS      : -0.220 ns (increased EAE multicycle count)
+
+Once again timing at 72.73 MHz is close to marginal. Note that the EAE contains large
+combinatorial multi-cycle paths, and with a short clock period the cycle count had to be
+increased. However, that was not enough to close timing.
 
 
 Performance: (using `mandel_perf_test.asm`)
@@ -164,7 +171,8 @@ Performance: (using `mandel_perf_test.asm`)
 
 This gives an CPI of 1.98.
 
-Note: It is not yet clear, why the instruction count is not identical to the old CPU.
+Note: It is not yet clear, why the instruction count is not identical to the old CPU. The
+increase is approximately 0.4%.
 
 The overall speedup in walltime is a factor of 0.163 / 0.067 = 2.4.
 
