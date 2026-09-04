@@ -171,8 +171,113 @@ Performance: (using `mandel_perf_test.asm`)
 
 This gives an CPI of 1.98.
 
-Note: It is not yet clear, why the instruction count is not identical to the old CPU. The
-increase is approximately 0.4%.
-
 The overall speedup in walltime is a factor of 0.163 / 0.067 = 2.4.
+
+Note: The number of instructions has increased by approximately 0.4%. The reason
+may not be entirely clear at first, but an explanation is given in the following
+section.
+
+## Increased instruction count
+Further investigation reveals the increased instruction count is directly
+related to the "faster" CPU. In particular, when waiting for a fixed number of
+**clock cycles** in a tight loop, the faster CPU will execute more instructions
+in the given time.
+
+Specifically, in the monitor function `UART$PUTCHAR` in `uart_library.asm` we see
+the following code snippet:
+
+```
+UART$PUTCHAR    INCRB                       ; Get a new register page
+                MOVE IO$UART_SRA, R0        ; R0: address of status register
+                MOVE IO$UART_THRA, R1       ; R1: address of transmit register
+_UART$PUTC_WAIT MOVE @R0, R2                ; read status register
+                AND 0x0002, R2              ; ready to transmit?
+                RBRA _UART$PUTC_WAIT, Z     ; loop until ready
+                MOVE R8, @R1                ; Print character
+                DECRB                       ; Restore the old page
+                RET
+```
+
+The tight loop around `_UART$PUTC_WAIT` consists of three instructions and takes
+up five words of instruction memory. The breakdown of cycle count (measured as
+clock cycles from previous to current assertion of `cpu_ins_cnt_strobe`).
+
+| Instruction     | OLD   | NEW   |
+| --------------- | ----- | ----- |
+| MOVE @R0, R2    | 4     |  1    |
+| AND <imm>, R2   | 4     |  2    |
+| RBRA <label>, Z | 4     |  7    |
+
+So we wee that the old design uses 12 clock cycles per loop iteration, whereas
+the new design uses just 10 clock cycles. Note also that the conditional branch
+is more expensive in the new design, due to the pipeline flush.
+
+### Breakdown of looping in the new CPU design
+
+The following diagram is generated from the following three instructions (with
+`R0=0x000A`):
+
+```
+0005  0048        LOOP     MOVE @R0, R2
+0006  9F88  0002           AND 0x0002, R2
+0008  FFA3  FFFB           RBRA LOOP, Z
+```
+
+The three instructions has its own colour, and the top three rows summarise
+which instruction occupies which pipeline register in each cycle. A flat line
+there means the stage is empty.
+
+![Polling loop waveform](loop_timing.png)
+
+The first and last column are identical, thus repeating every ten cycles.
+
+* **t=0**: the `RBRA` retires. `inst_done_o` pulses, `R15` is written with the
+  branch target `0x0005`, and `fetch_valid_o` redirects FETCH and flushes the
+  Icache. Everything FETCH had speculatively read past the branch — the four
+  words `0x000A` to `0x000D`, greyed out in the diagram — is thrown away.
+* **t=1**: FETCH issues the first instruction-memory request of the new stream,
+  for `0x0005`.
+* **t=2**: that word (`0x0048`) comes back and is handed to the Icache. The
+  pipeline is empty: DECODE, PREPARE and WRITE all have nothing.
+* **t=3**: the Icache offers it and DECODE accepts `MOVE @R0, R2`. Note
+  `m_double_o` is low — only one word is buffered so far — which is enough,
+  because this instruction has no immediate operand.
+* **t=4**: the `MOVE` sits in DECODE's output register and the Sequencer in
+  PREPARE issues its first micro-operation, `0x084` (`MEM_READ_SRC` +
+  `REG_MOD_SRC`). It holds `prep_ready_i` low, because a second micro-operation
+  is still to come.
+* **t=5**: WRITE puts the read of the device word on the data bus
+  (`mem_req_addr_o` = `0x000A`).
+* **t=6**: the device word returns on `msrc_data_o` and the Sequencer can
+  finally issue the second micro-operation, `0x828` (`LAST` + `MEM_WAIT_SRC` +
+  `REG_WRITE`). This is the loop's only genuine stall. In the same cycle DECODE
+  accepts the `AND`, this time consuming two words at once.
+* **t=7**: the `MOVE` retires and `R2` is written.
+* **t=8**: the `AND` retires. It is a single micro-operation, so it follows one
+  cycle behind. The device bit is still clear, so the `Z` flag it leaves in
+  `R14` is set and the branch will be taken. DECODE accepts the `RBRA`.
+* **t=9**: WRITE is idle. The `RBRA` is only now in DECODE's output register.
+* **t=10 = t=0**: the `RBRA` retires and redirects again.
+
+So of the ten cycles, three instructions retire in three of them (t=7, t=8,
+t=0), and the other seven are the price of the branch and of the memory access:
+
+
+
+| cycles | what they pay for |
+| --- | --- |
+| t=1, t=2, t=3 | branch refill — request, instruction-memory latency, Icache |
+| t=4 | DECODE and PREPARE latency for the first instruction |
+| t=5, t=6 | the round trip to the polled device word |
+| t=9 | a bubble in WRITE, see below |
+
+The bubble at t=9 is the interesting one, because it is a *second*, indirect
+cost of the data read. Watch the back-pressure travel backwards. The `MOVE`
+stalls PREPARE, so DECODE stops consuming (`m_ready_i` low at t=4 and t=5), so
+the Icache fills and refuses FETCH (`s_ready_o` low at t=5), so FETCH has no
+free slot and skips a request (`wb_stb_o` low at t=6). The word `0x0008` that
+FETCH offered at t=5 is therefore not taken until t=6, and the `RBRA`'s second
+word `0x0009` not until t=7 — which is why the Icache cannot offer the `RBRA` as
+a pair (`m_double_o`) before t=8, and why WRITE has nothing to do at t=9. One
+cycle of waiting for the device costs two cycles of loop.
 
