@@ -208,14 +208,13 @@ clock cycles from previous to current assertion of `cpu_ins_cnt_strobe`).
 | AND <imm>, R2   | 4     |  2    |
 | RBRA <label>, Z | 4     |  7    |
 
-So we wee that the old design uses 12 clock cycles per loop iteration, whereas
+So we see that the old design uses 12 clock cycles per loop iteration, whereas
 the new design uses just 10 clock cycles. Note also that the conditional branch
 is more expensive in the new design, due to the pipeline flush.
 
 ### Breakdown of looping in the new CPU design
 
-The following diagram is generated from the following three instructions (with
-`R0=0x000A`):
+The following diagram is generated from the following three instructions:
 
 ```
 0005  0048        LOOP     MOVE @R0, R2
