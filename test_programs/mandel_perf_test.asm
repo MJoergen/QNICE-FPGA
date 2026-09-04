@@ -70,7 +70,10 @@
 
 #include "../monitor/monitor.asm"
 
-QMON$COLDSTART  MOVE    IO$CYC_STATE, R0    ; reset hw cycle counter
+QMON$COLDSTART  AND     0x00FF, SR              ; make sure we are in rbank 0
+                MOVE    VAR$STACK_START, SP     ; initialize stack pointer
+
+                MOVE    IO$CYC_STATE, R0    ; reset hw cycle counter
                 MOVE    1, @R0
                 MOVE    IO$INS_STATE, R0    ; reset hw instruction counter
                 MOVE    1, @R0
@@ -81,10 +84,10 @@ QMON$COLDSTART  MOVE    IO$CYC_STATE, R0    ; reset hw cycle counter
 DIVERGENT       .EQU    0x0400              ; Constant for divergence test
 X_START         .EQU    -0x0200             ; -512 = - 2 * scale with scale = 256
 X_END           .EQU    0x0100              ; +128
-X_STEP          .EQU    0x000B              ; was 0x0006 == 10
+X_STEP          .EQU    0x00FB              ; was 0x000B
 Y_START         .EQU    -0x0180             ; -256
 Y_END           .EQU    0x0180              ; 256
-Y_STEP          .EQU    0x0013              ; was 0x000F == 25
+Y_STEP          .EQU    0x00F3              ; was 0x0013
 ITERATION       .EQU    0x001A              ; Number of iterations
 ;
 ; for (y = y_start; y <= y_end; y += y_step)

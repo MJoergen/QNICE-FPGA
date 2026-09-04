@@ -37,7 +37,7 @@ SRCS += $(SRC_DIR)/sim/uart.vhd
 SRCS += $(SRC_DIR)/sim/tb_core.vhd
 
 OPT_WAVE = --wave=tb_core.ghw
-OPT_STOP_TIME = --stop-time=3000us
+OPT_STOP_TIME = --stop-time=5ms
 
 all:
 	ghdl -a -fexplicit -fsynopsys $(SRCS)
