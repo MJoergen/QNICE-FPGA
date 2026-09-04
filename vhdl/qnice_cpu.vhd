@@ -9,6 +9,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.STD_LOGIC_ARITH.ALL;
 use IEEE.STD_LOGIC_UNSIGNED.ALL;
 use IEEE.NUMERIC_STD.ALL;
+use std.textio.all;
+use ieee.std_logic_textio.all;
 
 use work.cpu_constants.all;
 
@@ -213,6 +215,7 @@ signal Dst_Value_Fast      : std_logic_vector(15 downto 0);
 --attribute mark_debug of reg_read_data1 : signal is true;
 --attribute mark_debug of reg_read_data2 : signal is true;
 
+   file output_file : text open write_mode is "data_out.dat";
 begin
    -- Instruction is a register
    -- these signals are shortcuts to decode the components of the instruction
@@ -384,6 +387,87 @@ begin
          end if;
       end if;
    end process;
+
+   debug_proc : process (clk)
+      variable out_line : line;
+      variable reg_v : natural range 0 to 15;
+   begin
+      if rising_edge(clk) then
+         if cpu_state = cs_fetch and WAIT_FOR_DATA = '0' then
+            write(out_line, string'("ADDR="));
+            hwrite(out_line, PC);
+            write(out_line, string'(", INST="));
+            hwrite(out_line, DATA_IN);
+
+            if DATA_IN = X"0DBC" then
+               write(out_line, string'(" RET  "));
+            else
+               case DATA_IN(15 downto 12) is
+                  when "0000" => write(out_line, string'(" MOVE  "));
+                  when "0001" => write(out_line, string'(" ADD   "));
+                  when "0010" => write(out_line, string'(" ADDC  "));
+                  when "0011" => write(out_line, string'(" SUB   "));
+                  when "0100" => write(out_line, string'(" SUBC  "));
+                  when "0101" => write(out_line, string'(" SHL   "));
+                  when "0110" => write(out_line, string'(" SHR   "));
+                  when "0111" => write(out_line, string'(" SWAP  "));
+                  when "1000" => write(out_line, string'(" NOT   "));
+                  when "1001" => write(out_line, string'(" AND   "));
+                  when "1010" => write(out_line, string'(" OR    "));
+                  when "1011" => write(out_line, string'(" XOR   "));
+                  when "1100" => write(out_line, string'(" CMP   "));
+                  when "1101" => write(out_line, string'(" ????  "));
+                  when "1110" =>
+                     case DATA_IN(11 downto 6) is
+                        when "000000" => write(out_line, string'(" HALT  "));
+                        when "000001" => write(out_line, string'(" RTI   "));
+                        when "000010" => write(out_line, string'(" INT   "));
+                        when "000011" => write(out_line, string'(" INCRB "));
+                        when "000100" => write(out_line, string'(" DECRB "));
+                        when others   => write(out_line, string'(" ????  "));
+                     end case;
+                  when "1111" =>
+                     case DATA_IN(5 downto 4) is
+                        when "00"   => write(out_line, string'(" ABRA  "));
+                        when "01"   => write(out_line, string'(" ASUB  "));
+                        when "10"   => write(out_line, string'(" RBRA  "));
+                        when "11"   => write(out_line, string'(" RSUB  "));
+                        when others => write(out_line, string'(" ????  "));
+                     end case;
+                  when others => write(out_line, string'(" ????"));
+               end case;
+
+               if conv_integer(DATA_IN(15 downto 12)) < 14 then
+                  if DATA_IN(11 downto 6) = "111110" then
+                     write(out_line, string'("<imm>"));
+                  else
+                     reg_v := conv_integer(DATA_IN(11 downto 8));
+                     case DATA_IN(7 downto 6) is
+                        when "00"   => write(out_line, string'("R") & integer'image(reg_v));
+                        when "01"   => write(out_line, string'("@R") & integer'image(reg_v));
+                        when "10"   => write(out_line, string'("@R") & integer'image(reg_v) & string'("++"));
+                        when "11"   => write(out_line, string'("@--R") & integer'image(reg_v));
+                        when others => write(out_line, string'(" ????"));
+                     end case;
+                  end if;
+
+                  write(out_line, string'(", "));
+
+                  reg_v := conv_integer(DATA_IN(5 downto 2));
+                  case DATA_IN(1 downto 0) is
+                     when "00"   => write(out_line, string'("R") & integer'image(reg_v));
+                     when "01"   => write(out_line, string'("@R") & integer'image(reg_v));
+                     when "10"   => write(out_line, string'("@R") & integer'image(reg_v) & string'("++"));
+                     when "11"   => write(out_line, string'("@--R") & integer'image(reg_v));
+                     when others => write(out_line, string'(" ????"));
+                  end case;
+               end if;
+            end if;
+
+            writeline(output_file, out_line);
+         end if;
+      end if;
+   end process debug_proc;
       
    fsm_output_decode : process (cpu_state, ADDR_Bus, SP, SR, SR_tbw, PC, PC_org,
                                 DATA_IN, DATA_To_Bus, WAIT_FOR_DATA, INT_N, Int_Active,
