@@ -212,5 +212,5 @@ So we see that the old design uses 12 clock cycles per loop iteration, whereas
 the new design uses just 10 clock cycles. Note also that the conditional branch
 is more expensive in the new design, due to the pipeline flush.
 
-[Breakdown of looping in the new CPU design](https://github.com/MJoergen/qnice_cpu/doc/README.md#a-polling-loop-cycle-by-cycle)
+[Breakdown of looping in the new CPU design](https://github.com/MJoergen/qnice_cpu/blob/main/doc/README.md#a-polling-loop-cycle-by-cycle)
 
