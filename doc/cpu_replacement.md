@@ -127,7 +127,7 @@ Performance: (using `mandel_perf_test.asm`)
 
 This gives an Cycles Per Instruction (CPI) of 3.29.
 
-### New design
+### New design (@ commit cae4a24)
 
 Note: The extra logic added to `env1.vhd` is not included here. It is only a handful of
 LUTs and Registers.
@@ -135,12 +135,12 @@ LUTs and Registers.
 * Slice LUTs      : 938
 *   LUT as Logic  : 914
 *   LUT as Memory :  24
-* Slice Registers : 586
+* Slice Registers : 604
 * BRAM            :   2
-* Slices          : 355
+* Slices          : 372
 
 A note on the BRAM usage: They contain the register banks, which use a total of 256 x 8 x
-16 bits = 4 kBytes. This should perhaps reside in a single BRAM, but since the register
+16 bits = 4 kBytes. One could expect this to reside in a single BRAM, but since the register
 block has two read ports, data is duplicated with one read port each. This accounts for
 the 2 BRAMs.
 
